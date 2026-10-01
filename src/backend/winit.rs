@@ -141,9 +141,6 @@ impl ApplicationHandler for WinitBackend {
         self.window = Some(window.clone());
 
         window.request_redraw();
-
-        #[cfg(all(target_os = "windows"))]
-        {}
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -170,10 +167,6 @@ impl ApplicationHandler for WinitBackend {
                 }
 
                 self.draw();
-
-                if let Some(window) = &self.window {
-                    window.set_visible(true);
-                }
             }
             _ => (),
         }
@@ -233,7 +226,10 @@ impl OverlayBackend for WinitBackend {
 
             #[cfg(target_os = "windows")]
             {
-                window.request_redraw();
+                let Some(window) = &self.window else {
+                    return;
+                };
+
                 _ = window.request_inner_size(self.size);
             }
         }
