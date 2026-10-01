@@ -25,6 +25,7 @@ pub struct WinitBackend {
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
     contaxt: Option<Context<Arc<Window>>>,
     size: PhysicalSize<u32>,
+    done_first_draw: bool,
 }
 
 impl WinitBackend {
@@ -39,6 +40,7 @@ impl WinitBackend {
                 width: args.width,
                 height: args.height,
             },
+            done_first_draw: false,
         };
 
         info!(
@@ -78,10 +80,14 @@ impl ApplicationHandler for WinitBackend {
 
         #[cfg(all(target_os = "windows"))]
         let attributes = Window::default_attributes()
-            .with_inner_size(self.size)
+            .with_inner_size(PhysicalSize {
+                width: 0,
+                height: 0,
+            })
             .with_transparent(true)
             .with_position(position)
-            .with_decorations(false);
+            .with_decorations(false)
+            .with_visible(true);
 
         let window = event_loop.create_window(attributes).unwrap();
 
@@ -132,7 +138,12 @@ impl ApplicationHandler for WinitBackend {
 
         self.contaxt = Some(context);
         self.surface = Some(surface);
-        self.window = Some(window);
+        self.window = Some(window.clone());
+
+        window.request_redraw();
+
+        #[cfg(all(target_os = "windows"))]
+        {}
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -156,6 +167,12 @@ impl ApplicationHandler for WinitBackend {
                             )
                             .unwrap();
                     }
+                }
+
+                self.draw();
+
+                if let Some(window) = &self.window {
+                    window.set_visible(true);
                 }
             }
             _ => (),
@@ -215,6 +232,14 @@ impl OverlayBackend for WinitBackend {
 
         buffer.present().unwrap();
 
-        window.request_redraw();
+        if self.done_first_draw == false {
+            self.done_first_draw = true;
+
+            #[cfg(target_os = "windows")]
+            {
+                window.request_redraw();
+                _ = window.request_inner_size(self.size);
+            }
+        }
     }
 }
