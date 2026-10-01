@@ -13,8 +13,11 @@ use winit::window::{Window, WindowId};
 use crate::backend::{OverlayArgs, OverlayBackend};
 use crate::render::render_state::RenderState;
 
-#[cfg(all(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use winit::platform::x11::{WindowAttributesExtX11, WindowType};
+
+#[cfg(target_os = "windows")]
+use winit::platform::windows::WindowExtWindows;
 
 #[derive(Default)]
 pub struct WinitBackend {
@@ -61,6 +64,7 @@ impl ApplicationHandler for WinitBackend {
             position = Position::Physical(monitor_pos);
         }
 
+        #[cfg(all(target_os = "linux"))]
         let mut attributes = Window::default_attributes()
             .with_inner_size(self.size)
             .with_transparent(true)
@@ -72,10 +76,46 @@ impl ApplicationHandler for WinitBackend {
             attributes = attributes.with_x11_window_type(vec![WindowType::Utility]);
         }
 
+        #[cfg(all(target_os = "windows"))]
+        let attributes = Window::default_attributes()
+            .with_inner_size(self.size)
+            .with_transparent(true)
+            .with_position(position)
+            .with_decorations(false);
+
         let window = event_loop.create_window(attributes).unwrap();
 
         window.set_cursor_hittest(false).unwrap();
         window.set_window_level(winit::window::WindowLevel::AlwaysOnTop);
+
+        #[cfg(all(target_os = "windows"))]
+        {
+            use windows::Win32::UI::WindowsAndMessaging::{
+                GWL_EXSTYLE, GetWindowLongPtrW, SetWindowLongPtrW,
+            };
+
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW;
+            use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+            window.set_skip_taskbar(true);
+
+            if let Ok(handle) = window.window_handle() {
+                if let RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
+                    unsafe {
+                        let hwnd = HWND(win32_handle.hwnd.get() as *mut std::ffi::c_void);
+
+                        let current_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+
+                        SetWindowLongPtrW(
+                            hwnd,
+                            GWL_EXSTYLE,
+                            current_style | WS_EX_TOOLWINDOW.0 as isize,
+                        );
+                    }
+                }
+            }
+        }
 
         let window = Arc::new(window);
 

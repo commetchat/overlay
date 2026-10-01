@@ -1,6 +1,11 @@
 use log::info;
 
-use crate::backend::{OverlayArgs, OverlayBackend, wayland::WaylandBackend, winit::WinitBackend};
+use crate::backend::{OverlayArgs, OverlayBackend, winit::WinitBackend};
+
+#[cfg(all(target_os = "linux"))]
+use crate::backend::winit::WinitBackend;
+
+#[cfg(all(target_os = "linux"))]
 use std::env;
 
 mod backend;
@@ -12,19 +17,23 @@ pub fn pick_backend() -> Box<dyn OverlayBackend> {
         height: 1024,
     };
 
-    let session = env::var("XDG_SESSION_TYPE").ok();
+    #[cfg(target_os = "linux")]
+    {
+        let session = env::var("XDG_SESSION_TYPE").ok();
 
-    match session.as_deref() {
-        Some("wayland") => {
-            info!("Starting with wayland backend");
-            return Box::new(WaylandBackend::new(&args).unwrap());
-        }
-        _ => {
-            info!("Starting with winit backend");
-            return Box::new(WinitBackend::new(&args));
+        match session.as_deref() {
+            Some("wayland") => {
+                info!("Starting with wayland backend");
+                return Box::new(WaylandBackend::new(&args).unwrap());
+            }
+            _ => {
+                info!("Starting with winit backend");
+                return Box::new(WinitBackend::new(&args));
+            }
         }
     }
 
+    return Box::new(WinitBackend::new(&args));
 }
 
 fn main() {

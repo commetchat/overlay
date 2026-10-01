@@ -10,8 +10,13 @@ piet = "0.6.2"
 piet-tiny-skia = "0.2.3"
 tiny-skia = "0.11.4"
 raqote = "0.8.5"
-smithay-client-toolkit = "0.21.1" 
 stderrlog = "0.6.0"
-wayland-client = "0.31.14"
 winit = "0.30.13"
 softbuffer = "0.4.8"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+wayland-client = "0.31.14"
+smithay-client-toolkit = "0.21.1" 

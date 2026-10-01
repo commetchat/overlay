@@ -1,5 +1,7 @@
-pub mod wayland;
 pub mod winit;
+
+#[cfg(target_os = "linux")]
+pub mod wayland;
 
 pub struct OverlayArgs {
     pub width: u32,
