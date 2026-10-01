@@ -1,0 +1,17 @@
+[package]
+name = "overlay"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies] 
+bytemuck = "1.25.2"
+log = "0.4.34"
+piet = "0.6.2"
+piet-tiny-skia = "0.2.3"
+tiny-skia = "0.11.4"
+raqote = "0.8.5"
+smithay-client-toolkit = "0.21.1" 
+stderrlog = "0.6.0"
+wayland-client = "0.31.14"
+winit = "0.30.13"
+softbuffer = "0.4.8"
