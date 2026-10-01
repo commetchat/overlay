@@ -192,10 +192,6 @@ impl OverlayBackend for WinitBackend {
     }
 
     fn draw(&mut self) {
-        let Some(window) = &self.window else {
-            return;
-        };
-
         let width = self.size.width as usize;
         let height = self.size.height as usize;
 
