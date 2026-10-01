@@ -3,7 +3,7 @@ use log::info;
 use crate::backend::{OverlayArgs, OverlayBackend, winit::WinitBackend};
 
 #[cfg(all(target_os = "linux"))]
-use crate::backend::winit::WinitBackend;
+use crate::backend::wayland::WaylandBackend;
 
 #[cfg(all(target_os = "linux"))]
 use std::env;
@@ -33,7 +33,9 @@ pub fn pick_backend() -> Box<dyn OverlayBackend> {
         }
     }
 
+    #[cfg(target_os = "windows")]          
     return Box::new(WinitBackend::new(&args));
+            
 }
 
 fn main() {
