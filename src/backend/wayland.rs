@@ -193,9 +193,12 @@ impl OverlayBackend for WaylandBackend {
         loop {
             self.event_queue.dispatch_pending(&mut self.data).unwrap();
 
-            iter += 1;
+            let mut state = RenderState::new();
+            state.iteration = iter;
+            iter += 1 ;
+
             if self.data.configured {
-                self.data.draw(&RenderState { iteration: iter });
+                self.data.draw(&state);
             }
 
             self.event_queue.blocking_dispatch(&mut self.data).unwrap();
