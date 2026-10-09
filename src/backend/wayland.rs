@@ -173,7 +173,7 @@ impl WaylandState {
         }
 
         let elapsed = now.elapsed();
-        trace!("Frame rendered in: {:.2?}", elapsed);
+        // trace!("Frame rendered in: {:.2?}", elapsed);
 
         self.layer
             .wl_surface()
@@ -189,27 +189,31 @@ impl OverlayBackend for WaylandBackend {
     fn show(&self) {}
 
     fn run_event_queue(&mut self) {
-        let mut iter = 0;
+        let mut state = RenderState::new();
+
         loop {
-            self.event_queue.dispatch_pending(&mut self.data).unwrap();
-
-            let mut state = RenderState::new();
-            state.iteration = iter;
-            iter += 1 ;
-
-            if self.data.configured {
-                self.data.draw(&state);
-            }
-
-            self.event_queue.blocking_dispatch(&mut self.data).unwrap();
-            info!("Running loop!")
+            state.iteration += 1;
+            self.poll_event_queue(&state);
         }
     }
 
     fn draw(&mut self) {
         self.data.draw(&RenderState::new());
     }
+
+    fn poll_event_queue(&mut self, state: &RenderState) {
+        self.event_queue.dispatch_pending(&mut self.data).unwrap();
+
+        if self.data.configured {
+            self.data.draw(state);
+        }
+
+        self.event_queue.blocking_dispatch(&mut self.data).unwrap();
+    }
+
+    
 }
+
 
 impl CompositorHandler for WaylandState {
     fn scale_factor_changed(

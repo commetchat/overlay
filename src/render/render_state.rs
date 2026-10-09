@@ -26,23 +26,16 @@ impl RenderState {
         return RenderState {
             iteration: 0,
             users: vec![
-                UserData {
-                    display_name: "airyz".to_string(),
-                    state: UserState::Idle,
-                },
-                UserData {
-                    display_name: "pluto".to_string(),
-                    state: UserState::Talking,
-                },
-                UserData {
-                    display_name: "luna".to_string(),
-                    state: UserState::Muted,
-                },
             ],
         };
     }
 
     pub fn draw(&self, ctx: &mut piet_tiny_skia::RenderContext<'_, PixmapMut<'_>>) {
+        
+        if self.users.is_empty() {
+            return;
+        }
+       
         let text_size = 12.0;
 
         let mut y_position = text_size;
@@ -57,7 +50,7 @@ impl RenderState {
 
         let col = Color::hlca(((self.iteration % 360) as f64) * 5.0, 50.0, 50.0, 0.8);
         
-        let gradient = piet::LinearGradient::new(UnitPoint::new(0.0, 0.0), UnitPoint::new(0.5, 0.5),  (piet::Color::rgba8(0, 0, 0, 100), piet::Color::rgba8(0, 0, 0, 100), piet::Color::TRANSPARENT));
+        let gradient = piet::LinearGradient::new(UnitPoint::new(0.0, 0.0), UnitPoint::new(0.5, 0.5),  (piet::Color::rgba8(0, 0, 0, 100), piet::Color::rgba8(0, 0, 0, 100), col));
 
         
         ctx.fill(

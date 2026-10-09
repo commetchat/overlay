@@ -1,3 +1,5 @@
+use crate::render::render_state::RenderState;
+
 pub mod winit;
 
 #[cfg(target_os = "linux")]
@@ -12,6 +14,8 @@ pub trait OverlayBackend {
     fn show(&self);
 
     fn run_event_queue(&mut self);
+
+    fn poll_event_queue(&mut self, state: &RenderState);
 
     fn draw(&mut self);
 }

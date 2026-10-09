@@ -1,5 +1,6 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::time::Duration;
 
 use log::info;
 use piet_tiny_skia::Cache;
@@ -8,6 +9,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::{PhysicalPosition, PhysicalSize, Position};
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::platform::pump_events::EventLoopExtPumpEvents;
 use winit::window::{Window, WindowId};
 
 use crate::backend::{OverlayArgs, OverlayBackend};
@@ -19,8 +21,7 @@ use winit::platform::x11::{WindowAttributesExtX11, WindowType};
 #[cfg(target_os = "windows")]
 use winit::platform::windows::WindowExtWindows;
 
-#[derive(Default)]
-pub struct WinitBackend {
+pub struct WinitData {
     window: Option<Arc<Window>>,
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
     contaxt: Option<Context<Arc<Window>>>,
@@ -28,11 +29,16 @@ pub struct WinitBackend {
     done_first_draw: bool,
 }
 
+pub struct WinitBackend {
+    data: WinitData,
+    event_loop: EventLoop<()>,
+}
+
 impl WinitBackend {
     pub fn new(args: &OverlayArgs) -> WinitBackend {
         info!("new size: {} x {}", args.width, args.height);
 
-        let result = WinitBackend {
+        let result = WinitBackend { data: WinitData {
             window: None,
             surface: None,
             contaxt: None,
@@ -41,18 +47,20 @@ impl WinitBackend {
                 height: args.height,
             },
             done_first_draw: false,
+        },
+        event_loop: EventLoop::new().unwrap(),
         };
 
         info!(
             "winit: created window with size: {} x {}",
-            result.size.width, result.size.height
+            result.data.size.width, result.data.size.height
         );
 
         return result;
     }
 }
 
-impl ApplicationHandler for WinitBackend {
+impl ApplicationHandler for WinitData {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         info!(
             "winit: creating window with size: {} x {}",
@@ -173,18 +181,8 @@ impl ApplicationHandler for WinitBackend {
     }
 }
 
-impl OverlayBackend for WinitBackend {
-    fn show(&self) {}
-
-    fn run_event_queue(&mut self) {
-        let event_loop = EventLoop::new().unwrap();
-
-        event_loop.set_control_flow(ControlFlow::Poll);
-
-        event_loop.run_app(self).unwrap();
-    }
-
-    fn draw(&mut self) {
+impl WinitData {
+    pub fn draw(&mut self) {
         let width = self.size.width as usize;
         let height = self.size.height as usize;
 
@@ -234,4 +232,25 @@ impl OverlayBackend for WinitBackend {
             }
         }
     }
+}
+
+impl OverlayBackend for WinitBackend {
+    fn show(&self) {}
+
+    fn run_event_queue(&mut self) {
+        let event_loop = EventLoop::new().unwrap();
+        event_loop.set_control_flow(ControlFlow::Poll);
+        event_loop.run_app(&mut self.data).unwrap();
+
+    }
+
+        
+    fn poll_event_queue(&mut self, state: &RenderState) {
+        self.event_loop.pump_app_events(Some(Duration::ZERO), &mut self.data);
+    }
+
+    fn draw(&mut self) {
+        self.data.draw();
+    }
+
 }
