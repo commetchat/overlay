@@ -105,6 +105,7 @@ pub fn run_overlay() {
 
         overlay.poll_event_queue(&state);
 
+        state.changed = false;
 
         std::thread::sleep(Duration::from_millis(35));
     }
