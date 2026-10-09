@@ -61,7 +61,7 @@ impl WaylandBackend {
     pub fn new(args: &OverlayArgs) -> Result<WaylandBackend, Box<dyn std::error::Error>> {
         let connection = Connection::connect_to_env()?;
 
-        let (globals, event_queue) = registry_queue_init(&connection)?;
+        let (globals, mut event_queue) = registry_queue_init(&connection)?;
 
         let qh: QueueHandle<WaylandState> = event_queue.handle();
 
@@ -102,8 +102,7 @@ impl WaylandBackend {
 
         let pool = SlotPool::new(pool_size, &shm)?;
 
-        return Ok(WaylandBackend {
-            data: WaylandState {
+        let mut state = WaylandState {
                 registry_state: RegistryState::new(&globals),
                 output_state: output_state,
                 shm,
@@ -114,7 +113,12 @@ impl WaylandBackend {
                 width: args.width,
                 height: args.height,
                 configured: false,
-            },
+            };
+
+        event_queue.blocking_dispatch(&mut state);
+
+        return Ok(WaylandBackend {
+            data: state,
             event_queue,
         });
     }
@@ -204,11 +208,14 @@ impl OverlayBackend for WaylandBackend {
     fn poll_event_queue(&mut self, state: &RenderState) {
         self.event_queue.dispatch_pending(&mut self.data).unwrap();
 
-        if self.data.configured {
-            self.data.draw(state);
+        if state.changed {
+            log::info!("State changed, redrawing");
         }
 
-        self.event_queue.blocking_dispatch(&mut self.data).unwrap();
+        if self.data.configured && state.changed {
+            self.data.draw(state);
+            let _ = self.event_queue.blocking_dispatch(&mut self.data);
+        }
     }
 
     
