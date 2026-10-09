@@ -2,6 +2,8 @@ use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+#[cfg(target_os = "windows")]
+use crate::backend::winit::WinitBackend;
 use crate::{
     backend::{OverlayArgs, OverlayBackend, winit::WinitData},
     render::render_state::{RenderState, UserData, UserState},
@@ -51,7 +53,7 @@ pub fn pick_backend() -> Box<dyn OverlayBackend> {
     }
 
     #[cfg(target_os = "windows")]
-    return Box::new(WinitData::new(&args));
+    return Box::new(WinitBackend::new(&args));
 }
 
 pub enum Message {
@@ -102,6 +104,9 @@ pub fn run_overlay() {
         state.iteration += 1;
 
         overlay.poll_event_queue(&state);
+
+
+        std::thread::sleep(Duration::from_millis(35));
     }
 }
 
@@ -132,6 +137,8 @@ fn handle_messages(state: &mut RenderState, msg: WidgetMessage) {
                             }
                         })
                         .collect();
+
+                    state.changed = true;
                 }
                 Err(_) => {
                     warn!("Failed to parse voip state")

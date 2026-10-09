@@ -1,13 +1,16 @@
 use std::vec;
 
 use piet::{
-    Color, FontFamily, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint, kurbo::{Circle, Point, Rect},
+    Color, FontFamily, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint,
+    kurbo::{Circle, Point, Rect},
 };
 
-use tiny_skia::{ PixmapMut};
+use tiny_skia::PixmapMut;
+
 pub struct RenderState {
     pub iteration: i32,
     pub users: Vec<UserData>,
+    pub changed: bool,
 }
 
 pub enum UserState {
@@ -25,18 +28,20 @@ impl RenderState {
     pub fn new() -> RenderState {
         return RenderState {
             iteration: 0,
-            users: vec![
-            ],
+            changed: true,
+            users: vec![UserData {
+                display_name: "test".to_string(),
+                state: UserState::Idle,
+            }],
         };
     }
 
     pub fn draw(&self, ctx: &mut piet_tiny_skia::RenderContext<'_, PixmapMut<'_>>) {
-        
-        if self.users.is_empty() {
-            return;
-        }
-       
-        let text_size = 12.0;
+        // if self.users.is_empty() {
+        //     return;
+        // }
+
+        let text_size = 32.0;
 
         let mut y_position = text_size;
         let x_position = text_size;
@@ -48,15 +53,19 @@ impl RenderState {
 
         let height = y_position + (text_size * 2.0 * (self.users.len() as f64));
 
-        let col = Color::hlca(((self.iteration % 360) as f64) * 5.0, 50.0, 50.0, 0.8);
-        
-        let gradient = piet::LinearGradient::new(UnitPoint::new(0.0, 0.0), UnitPoint::new(0.5, 0.5),  (piet::Color::rgba8(0, 0, 0, 100), piet::Color::rgba8(0, 0, 0, 100), col));
+        let col = Color::hlca(((self.iteration % 360) as f64) * 40.0, 50.0, 50.0, 0.8);
 
-        
-        ctx.fill(
-            Rect::new(0.0, 0.0, 200.0, height),
-            &gradient,
+        let gradient = piet::LinearGradient::new(
+            UnitPoint::new(0.0, 0.0),
+            UnitPoint::new(0.5, 0.5),
+            (
+                piet::Color::rgba8(0, 0, 0, 100),
+                piet::Color::rgba8(0, 0, 0, 100),
+                col,
+            ),
         );
+
+        ctx.fill(Rect::new(0.0, 0.0, 200.0, height), &gradient);
 
         for entry in self.users.iter() {
             let text = entry.display_name.clone();
@@ -125,10 +134,7 @@ impl RenderState {
                     y_position + (circle_radius / 2.0) + y_pad,
                 );
 
-                ctx.fill(
-                    Circle::new(icon_position, circle_radius * 0.5),
-                    &col
-                );
+                ctx.fill(Circle::new(icon_position, circle_radius * 0.5), &col);
             }
 
             // let size = shadow.image_bounds();

@@ -38,17 +38,18 @@ impl WinitBackend {
     pub fn new(args: &OverlayArgs) -> WinitBackend {
         info!("new size: {} x {}", args.width, args.height);
 
-        let result = WinitBackend { data: WinitData {
-            window: None,
-            surface: None,
-            contaxt: None,
-            size: PhysicalSize {
-                width: args.width,
-                height: args.height,
+        let result = WinitBackend {
+            data: WinitData {
+                window: None,
+                surface: None,
+                contaxt: None,
+                size: PhysicalSize {
+                    width: args.width,
+                    height: args.height,
+                },
+                done_first_draw: false,
             },
-            done_first_draw: false,
-        },
-        event_loop: EventLoop::new().unwrap(),
+            event_loop: EventLoop::new().unwrap(),
         };
 
         info!(
@@ -78,6 +79,7 @@ impl ApplicationHandler for WinitData {
         let mut attributes = Window::default_attributes()
             .with_inner_size(self.size)
             .with_transparent(true)
+            .with_title("Commet Overlay")
             .with_position(position)
             .with_decorations(false);
 
@@ -92,6 +94,7 @@ impl ApplicationHandler for WinitData {
                 width: 0,
                 height: 0,
             })
+            .with_title("Commet Overlay")
             .with_transparent(true)
             .with_position(position)
             .with_decorations(false)
@@ -158,7 +161,7 @@ impl ApplicationHandler for WinitData {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                self.draw();
+                self.draw(&RenderState::new());
             }
             WindowEvent::Resized(size) => {
                 self.size = size;
@@ -174,7 +177,7 @@ impl ApplicationHandler for WinitData {
                     }
                 }
 
-                self.draw();
+                self.draw(&RenderState::new());
             }
             _ => (),
         }
@@ -182,7 +185,7 @@ impl ApplicationHandler for WinitData {
 }
 
 impl WinitData {
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, state: &RenderState) {
         let width = self.size.width as usize;
         let height = self.size.height as usize;
 
@@ -191,8 +194,6 @@ impl WinitData {
         }
 
         let mut pixels = vec![0u8; width * height * 4];
-
-        let state = &RenderState::new();
 
         let mut cache = Cache::new();
 
@@ -241,16 +242,18 @@ impl OverlayBackend for WinitBackend {
         let event_loop = EventLoop::new().unwrap();
         event_loop.set_control_flow(ControlFlow::Poll);
         event_loop.run_app(&mut self.data).unwrap();
-
     }
 
-        
     fn poll_event_queue(&mut self, state: &RenderState) {
-        self.event_loop.pump_app_events(Some(Duration::ZERO), &mut self.data);
+        self.event_loop
+            .pump_app_events(Some(Duration::ZERO), &mut self.data);
+
+        if state.changed {
+            self.data.draw(&state);
+        }
     }
 
     fn draw(&mut self) {
-        self.data.draw();
+        self.data.draw(&RenderState::new());
     }
-
 }
