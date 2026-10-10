@@ -4,12 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies] 
-bytemuck = "1.25.2"
 log = "0.4.34"
 piet = {version="0.6.2", features = ["image"]}
 piet-tiny-skia = "0.2.3"
 tiny-skia = "0.11.4"
-raqote = "0.8.5"
 stderrlog = "0.6.0"
 winit = "0.30.13"
 softbuffer = "0.4.8"
