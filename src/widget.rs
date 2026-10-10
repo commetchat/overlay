@@ -15,6 +15,8 @@ pub struct WidgetMessage {
     pub action: String,
     pub api: String,
     pub data: serde_json::Value,
+    pub response: Option<serde_json::Value>,
+
     #[serde(rename = "requestId")]
     pub request_id: String,
 

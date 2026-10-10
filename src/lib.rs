@@ -1,12 +1,15 @@
-use log::{info, trace, warn};
+use base64::prelude::*;
+
+use log::{info, warn};
+use piet::ImageBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 #[cfg(target_os = "windows")]
 use crate::backend::winit::WinitBackend;
 use crate::{
-    backend::{OverlayArgs, OverlayBackend, winit::WinitData},
-    render::render_state::{RenderState, UserData, UserState},
+    backend::{OverlayArgs, OverlayBackend},
+    render::render_state::{ImageState, RenderState},
     widget::{Widget, WidgetMessage},
 };
 
@@ -17,10 +20,9 @@ use crate::backend::wayland::WaylandBackend;
 use std::env;
 use std::{
     collections::BTreeMap,
-    io::{self, BufReader, Write},
+    io::{self},
     process::exit,
-    sync::mpsc::{Receiver, Sender, channel},
-    thread,
+    sync::mpsc::{Sender, channel},
     time::Duration,
 };
 
@@ -73,7 +75,7 @@ pub struct VoipStateData {
     state: BTreeMap<String, VoipMemberState>,
 }
 
-pub fn run_overlay() {
+pub fn run_overlay(dev_mode: bool) {
     stderrlog::new()
         .verbosity(log::LevelFilter::Trace)
         .module(module_path!())
@@ -90,6 +92,40 @@ pub fn run_overlay() {
 
     let mut state = RenderState::new();
 
+    state.item_height = 16;
+
+    if dev_mode {
+        state.users.insert(
+            "@test:example.org".to_string(),
+            VoipMemberState {
+                avatar_url: None,
+                display_name: "Luna".to_string(),
+                muted: false,
+                talking: false,
+            },
+        );
+
+        state.users.insert(
+            "@test2:example.org".to_string(),
+            VoipMemberState {
+                avatar_url: None,
+                display_name: "Pluto".to_string(),
+                muted: false,
+                talking: true,
+            },
+        );
+
+        state.users.insert(
+            "@test3:example.org".to_string(),
+            VoipMemberState {
+                avatar_url: None,
+                display_name: "Curiosity".to_string(),
+                muted: true,
+                talking: false,
+            },
+        );
+    }
+
     let mut widget = widget::Widget { num_requests: 0 };
 
     widget.send_from_widget("supported_api_versions", json!({}));
@@ -98,7 +134,7 @@ pub fn run_overlay() {
         let msg = widget.read_message(&input_receiver);
 
         if let Some(msg) = msg {
-            handle_messages(&mut state, msg);
+            handle_messages(&mut state, &mut widget, msg);
         }
 
         state.iteration += 1;
@@ -111,42 +147,145 @@ pub fn run_overlay() {
     }
 }
 
-fn handle_messages(state: &mut RenderState, msg: WidgetMessage) {
+fn handle_messages(state: &mut RenderState, widget: &mut Widget, msg: WidgetMessage) {
     match msg.action.as_str() {
         "chat.commet.voip_overlay.voip_state" => {
-            match serde_json::from_value::<VoipStateData>(msg.data) {
-                Ok(new_state) => {
-                    info!("Received new voip state! {:?}", new_state);
-
-                    state.users = new_state
-                        .state
-                        .values()
-                        .map(|f| {
-                            let mut user_state = UserState::Idle;
-
-                            if f.muted {
-                                user_state = UserState::Muted;
-                            }
-
-                            if f.talking {
-                                user_state = UserState::Talking;
-                            }
-
-                            UserData {
-                                display_name: f.display_name.clone(),
-                                state: user_state,
-                            }
-                        })
-                        .collect();
-
-                    state.changed = true;
-                }
-                Err(_) => {
-                    warn!("Failed to parse voip state")
-                }
-            }
+            handle_voip_state_changed(state, widget, msg);
+        }
+        "org.matrix.msc4039.download_file" => {
+            _ = handle_file_download(state, widget, msg);
         }
         _ => (),
+    }
+}
+
+enum WidgetError {
+    InvalidRequest,
+}
+
+fn handle_file_download(
+    state: &mut RenderState,
+    _widget: &mut Widget,
+    msg: WidgetMessage,
+) -> Result<(), WidgetError> {
+    let content_uri = msg.data.as_object().ok_or(WidgetError::InvalidRequest)?;
+    let content_uri = content_uri
+        .get("content_uri")
+        .ok_or(WidgetError::InvalidRequest)?;
+    let content_uri = content_uri.as_str().ok_or(WidgetError::InvalidRequest)?;
+
+    let response = msg.response.ok_or(WidgetError::InvalidRequest)?;
+    let file = response.get("file").ok_or(WidgetError::InvalidRequest)?;
+    let file = file.as_object().ok_or(WidgetError::InvalidRequest)?;
+
+    if let Some(custom_type) = file.get("__type") {
+        let custom_type = custom_type.as_str().ok_or(WidgetError::InvalidRequest)?;
+
+        if custom_type == "Blob" {
+            if let Some(data_b64) = file.get("data") {
+                let data_b64 = data_b64.as_str().ok_or(WidgetError::InvalidRequest)?;
+
+                let decoded = BASE64_STANDARD
+                    .decode(data_b64)
+                    .or(Err(WidgetError::InvalidRequest))?;
+
+                info!(
+                    "Received image for {} ({} bytes)",
+                    content_uri,
+                    decoded.len()
+                );
+
+                match image::load_from_memory(&decoded) {
+                    Ok(img) => {
+                        info!("Successfully decoded image!");
+
+                        // resize image to save memory
+                        let img = img.resize(
+                            state.item_height * 2,
+                            state.item_height * 2,
+                            image::imageops::FilterType::CatmullRom,
+                        );
+
+                        let buf = match img.has_alpha() {
+                            true => {
+                                let rgb = img.to_rgba8();
+                                ImageBuf::from_raw(
+                                    rgb.to_vec(),
+                                    piet::ImageFormat::RgbaSeparate,
+                                    img.width() as usize,
+                                    img.height() as usize,
+                                )
+                            }
+                            false => {
+                                let rgb = img.to_rgb8();
+                                ImageBuf::from_raw(
+                                    rgb.to_vec(),
+                                    piet::ImageFormat::Rgb,
+                                    img.width() as usize,
+                                    img.height() as usize,
+                                )
+                            }
+                        };
+
+                        state
+                            .images
+                            .insert(content_uri.to_string(), ImageState::Received(buf));
+                    }
+                    Err(_) => {
+                        warn!("Failed to decode image");
+                        state
+                            .images
+                            .insert(content_uri.to_string(), ImageState::FailedToDecode);
+                    }
+                }
+
+                state.changed = true;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_voip_state_changed(state: &mut RenderState, widget: &mut Widget, msg: WidgetMessage) {
+    match serde_json::from_value::<VoipStateData>(msg.data) {
+        Ok(new_state) => {
+            info!("Received new voip state! {:?}", new_state);
+
+            state.users = new_state.state;
+
+            for (_id, user) in state.users.iter() {
+                if let Some(img) = &user.avatar_url {
+                    if !state.images.contains_key(img) {
+                        info!("Requesting image: {}", img);
+
+                        widget.send_from_widget(
+                            "org.matrix.msc4039.download_file",
+                            json!({
+                                "content_uri": img.clone()
+                            }),
+                        );
+
+                        state.images.insert(img.clone(), ImageState::Pending);
+                    }
+                }
+            }
+
+            let unneeded_images: Vec<String> = state.images.iter_mut().filter(|(key, _)| 
+                !state.users.iter().any(|(_user, s)| s.avatar_url == Some(key.to_string())
+            )).map(|i| i.0.clone()).collect();
+            
+            for image in unneeded_images {
+                state.images.remove(&image);
+                info!("Removing unneeded image: {}", image);
+            }
+
+
+            state.changed = true;
+        }
+        Err(_) => {
+            warn!("Failed to parse voip state")
+        }
     }
 }
 

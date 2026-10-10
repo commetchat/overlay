@@ -1,27 +1,26 @@
-use std::vec;
+use std::collections::BTreeMap;
 
 use piet::{
-    Color, FontFamily, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint,
+    Color, FontFamily, ImageBuf, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint,
     kurbo::{Circle, Point, Rect},
 };
 
 use tiny_skia::PixmapMut;
 
+use crate::VoipMemberState;
+
+pub enum ImageState {
+    Pending,
+    Received(ImageBuf),
+    FailedToDecode,
+}
+
 pub struct RenderState {
     pub iteration: i32,
-    pub users: Vec<UserData>,
+    pub users: BTreeMap<String, VoipMemberState>,
+    pub images: BTreeMap<String, ImageState>,
+    pub item_height: u32,
     pub changed: bool,
-}
-
-pub enum UserState {
-    Idle,
-    Talking,
-    Muted,
-}
-
-pub struct UserData {
-    pub display_name: String,
-    pub state: UserState,
 }
 
 impl RenderState {
@@ -29,10 +28,9 @@ impl RenderState {
         return RenderState {
             iteration: 0,
             changed: true,
-            users: vec![UserData {
-                display_name: "test".to_string(),
-                state: UserState::Idle,
-            }],
+            item_height: 32,
+            images: BTreeMap::new(),
+            users: BTreeMap::new(),
         };
     }
 
@@ -41,52 +39,48 @@ impl RenderState {
         //     return;
         // }
 
-        let text_size = 32.0;
+        let text_size = self.item_height as f64;
 
-        let mut y_position = text_size;
-        let x_position = text_size;
+        let mut y_position = text_size * 3.0;
+        let x_position = text_size * 2.0;
 
         let font = ctx
             .text()
             .font_family("Roboto")
             .unwrap_or(FontFamily::MONOSPACE);
-
-        let height = y_position + (text_size * 2.0 * (self.users.len() as f64));
-
+       
         let col = Color::hlca(((self.iteration % 360) as f64) * 40.0, 50.0, 50.0, 0.8);
+        
+        let draw_background = false;
+        if draw_background {
+            let height = (y_position * 2.0) + (text_size * 2.0 * (self.users.len() as f64));
 
-        let gradient = piet::LinearGradient::new(
-            UnitPoint::new(0.0, 0.0),
-            UnitPoint::new(0.5, 0.5),
-            (
-                piet::Color::rgba8(0, 0, 0, 100),
-                piet::Color::rgba8(0, 0, 0, 100),
-                col,
-            ),
-        );
 
-        ctx.fill(Rect::new(0.0, 0.0, 200.0, height), &gradient);
+            let gradient = piet::LinearGradient::new(
+                UnitPoint::new(0.0, 0.0),
+                UnitPoint::new(0.5, 0.5),
+                (
+                    piet::Color::rgba8(0, 0, 0, 100),
+                    piet::Color::rgba8(0, 0, 0, 100),
+                    piet::Color::TRANSPARENT,
+                ),
+            );
 
-        for entry in self.users.iter() {
+            ctx.fill(Rect::new(0.0, 0.0, text_size * 12.5, height), &gradient);
+        }
+
+        for (_user_id, entry) in self.users.iter() {
             let text = entry.display_name.clone();
 
-            let alpha = match entry.state {
-                UserState::Idle => 255,
-                UserState::Talking => 255,
-                UserState::Muted => 120,
-            };
+            let mut alpha = 255;
 
-            let draw_image_outline = match entry.state {
-                UserState::Idle => false,
-                UserState::Talking => true,
-                UserState::Muted => false,
-            };
+            if entry.muted {
+                alpha = 120;
+            }
 
-            let show_icon = match entry.state {
-                UserState::Idle => false,
-                UserState::Talking => false,
-                UserState::Muted => true,
-            };
+            let draw_image_outline = entry.talking;
+
+            let show_icon = entry.muted;
 
             let shadow = ctx
                 .text()
@@ -120,10 +114,41 @@ impl RenderState {
                 );
             }
 
-            ctx.fill(
-                Circle::new(circle_position, circle_radius),
-                &Color::rgba8(45, 45, 45, alpha),
-            );
+            let img = match &entry.avatar_url {
+                Some(img) => match self.images.get(img) {
+                    Some(state) => match state {
+                        ImageState::Pending => None,
+                        ImageState::Received(image_buf) => Some(image_buf),
+                        ImageState::FailedToDecode => None,
+                    },
+                    None => None,
+                },
+                None => None,
+            };
+
+            if let Some(img) = img {
+                let img = &img.to_image(ctx);
+
+                _ = ctx.with_save(|rc| {
+                    rc.clip(Circle::new(circle_position, circle_radius));
+
+                    let rect = Rect {
+                        x0: circle_position.x - circle_radius,
+                        x1: circle_position.x + circle_radius,
+                        y0: circle_position.y - circle_radius,
+                        y1: circle_position.y + circle_radius,
+                    };
+
+                    rc.draw_image(img, rect, piet::InterpolationMode::Bilinear);
+
+                    Ok(())
+                });
+            } else {
+                ctx.fill(
+                    Circle::new(circle_position, circle_radius),
+                    &Color::rgba8(45, 45, 45, alpha),
+                );
+            }
 
             x += circle_radius * 2.0;
             x += text_size * 0.5;

@@ -115,7 +115,7 @@ impl WaylandBackend {
                 configured: false,
             };
 
-        event_queue.blocking_dispatch(&mut state);
+        _ = event_queue.blocking_dispatch(&mut state);
 
         return Ok(WaylandBackend {
             data: state,
@@ -126,8 +126,8 @@ impl WaylandBackend {
 
 impl WaylandState {
     fn draw(&mut self, state: &RenderState) {
-        use std::time::Instant;
-        let now = Instant::now();
+        // use std::time::Instant;
+        // let now = Instant::now();
 
         let width = self.width;
         let height = self.height;
@@ -176,7 +176,7 @@ impl WaylandState {
             px.swap(0, 2);
         }
 
-        let elapsed = now.elapsed();
+        // let elapsed = now.elapsed();
         // trace!("Frame rendered in: {:.2?}", elapsed);
 
         self.layer
