@@ -18,4 +18,6 @@ pub trait OverlayBackend {
     fn poll_event_queue(&mut self, state: &RenderState);
 
     fn draw(&mut self);
+
+    fn make_render_state(&mut self) -> RenderState;
 }

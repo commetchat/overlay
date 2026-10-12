@@ -90,19 +90,8 @@ pub fn run_overlay(dev_mode: bool) {
 
     std::thread::spawn(|| read_data(input_sender));
 
-    let mut state = RenderState::new();
+    let mut state = overlay.make_render_state();
 
-    let icon_data = embed_file::embed_bytes!("../assets/mic_off.png");
-    let mute_icon = image::load_from_memory(&icon_data).unwrap();
-
-    let mute_icon = ImageBuf::from_raw(
-        mute_icon.to_rgba8().to_vec(),
-        piet::ImageFormat::RgbaSeparate,
-        mute_icon.width() as usize,
-        mute_icon.height() as usize,
-    );
-
-    state.mute_icon = Some(mute_icon);
     state.item_height = 16;
 
     if dev_mode {

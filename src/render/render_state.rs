@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use piet::{
-    Color, FontFamily, ImageBuf, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint,
-    kurbo::{Circle, Point, Rect},
+    Color, FontFamily, FontWeight, ImageBuf, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint, kurbo::{Circle, Point, Rect},
 };
 
+use piet_tiny_skia::Cache;
 use tiny_skia::PixmapMut;
 
 use crate::VoipMemberState;
@@ -21,18 +21,36 @@ pub struct RenderState {
     pub images: BTreeMap<String, ImageState>,
     pub item_height: u32,
     pub changed: bool,
-    pub mute_icon: Option<ImageBuf>,
+    pub mute_icon: ImageBuf,
+    pub font: FontFamily,
 }
 
 impl RenderState {
-    pub fn new() -> RenderState {
+    pub fn new(cache: &mut Cache) -> RenderState {
+        let icon_data = embed_file::embed_bytes!("../../assets/mic_off.png");
+        let mute_icon = image::load_from_memory(&icon_data).unwrap();
+
+        let mute_icon = ImageBuf::from_raw(
+            mute_icon.to_rgba8().to_vec(),
+            piet::ImageFormat::RgbaSeparate,
+            mute_icon.width() as usize,
+            mute_icon.height() as usize,
+        );
+
+        let mut pixmap = tiny_skia::Pixmap::new(1024, 1024).unwrap();
+        let mut ctx = cache.render_context(pixmap.as_mut());
+
+        let font_data = embed_file::embed_bytes!("../../assets/Nunito-Bold.ttf");
+        let txt = ctx.text().load_font(&font_data).unwrap();
+
         return RenderState {
             iteration: 0,
             changed: true,
             item_height: 32,
             images: BTreeMap::new(),
             users: BTreeMap::new(),
-            mute_icon: None,
+            mute_icon: mute_icon,
+            font: txt,
         };
     }
 
@@ -46,10 +64,6 @@ impl RenderState {
         let mut y_position = text_size * 3.0;
         let x_position = text_size * 2.0;
 
-        let font = ctx
-            .text()
-            .font_family("Roboto")
-            .unwrap_or(FontFamily::MONOSPACE);
 
         let draw_background = false;
         if draw_background {
@@ -80,20 +94,23 @@ impl RenderState {
             let draw_image_outline = entry.talking;
 
             let show_mute_icon = entry.muted;
+            
 
             let shadow = ctx
                 .text()
                 .new_text_layout(text.clone())
-                .font(font.clone(), text_size)
+                .font(self.font.clone(), text_size)
                 .text_color(Color::rgba8(0, 0, 0, alpha))
+                .default_attribute(FontWeight::BOLD)
                 .build()
                 .unwrap();
 
             let highlight = ctx
                 .text()
                 .new_text_layout(text.clone())
-                .font(font.clone(), text_size)
+                .font(self.font.clone(), text_size)
                 .text_color(Color::rgba8(255, 255, 255, alpha))
+                .default_attribute(FontWeight::BOLD)
                 .build()
                 .unwrap();
 
@@ -167,10 +184,9 @@ impl RenderState {
                     y1: icon_position.y + radius,
                 };
 
-                let img =  self.mute_icon.as_ref().unwrap().to_image(ctx);
+                let img = self.mute_icon.to_image(ctx);
 
                 ctx.draw_image(&img, rect, piet::InterpolationMode::Bilinear);
-
             }
 
             ctx.draw_text(&shadow, Point::new(x, y_position));

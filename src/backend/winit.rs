@@ -25,6 +25,7 @@ pub struct WinitData {
     window: Option<Arc<Window>>,
     surface: Option<Surface<Arc<Window>, Arc<Window>>>,
     contaxt: Option<Context<Arc<Window>>>,
+    cache: Cache,
     size: PhysicalSize<u32>,
     done_first_draw: bool,
 }
@@ -43,6 +44,7 @@ impl WinitBackend {
                 window: None,
                 surface: None,
                 contaxt: None,
+                cache: Cache::new(),
                 size: PhysicalSize {
                     width: args.width,
                     height: args.height,
@@ -161,7 +163,8 @@ impl ApplicationHandler for WinitData {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                self.draw(&RenderState::new());
+                let state = RenderState::new(&mut self.cache);
+                self.draw(&state);
             }
             WindowEvent::Resized(size) => {
                 self.size = size;
@@ -177,7 +180,8 @@ impl ApplicationHandler for WinitData {
                     }
                 }
 
-                self.draw(&RenderState::new());
+                let state = RenderState::new(&mut self.cache);
+                self.draw(&state);
             }
             _ => (),
         }
@@ -195,7 +199,7 @@ impl WinitData {
 
         let mut pixels = vec![0u8; width * height * 4];
 
-        let mut cache = Cache::new();
+        let cache = &mut self.cache;
 
         let mut pixmap = tiny_skia::PixmapMut::from_bytes(&mut pixels, width as u32, height as u32)
             .ok_or("invalid pixmap")
@@ -254,6 +258,11 @@ impl OverlayBackend for WinitBackend {
     }
 
     fn draw(&mut self) {
-        self.data.draw(&RenderState::new());
+        let state = RenderState::new(&mut self.data.cache);
+        self.data.draw(&state);
+    }
+    
+    fn make_render_state(&mut self) -> RenderState {
+        RenderState::new(&mut self.data.cache)
     }
 }

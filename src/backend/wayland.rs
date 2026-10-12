@@ -23,9 +23,7 @@ use smithay_client_toolkit::{
 };
 
 use wayland_client::{
-    Connection, EventQueue, QueueHandle,
-    globals::registry_queue_init,
-    protocol::{wl_output, wl_region::WlRegion, wl_shm, wl_surface},
+    Connection, EventQueue, QueueHandle, globals::registry_queue_init, protocol::{wl_output, wl_region::WlRegion, wl_shm, wl_surface},
 };
 
 use crate::{
@@ -75,12 +73,14 @@ impl WaylandBackend {
 
         let surface = compositor.create_surface(&qh);
 
+        let output = output_state.outputs().next();
+
         let layer = layer_shell.create_layer_surface(
             &qh,
             surface,
             Layer::Overlay,
             Some("rust-overlay"),
-            None,
+            output.as_ref(),
         );
 
         let wl_compositor = compositor.wl_compositor();
@@ -103,17 +103,17 @@ impl WaylandBackend {
         let pool = SlotPool::new(pool_size, &shm)?;
 
         let mut state = WaylandState {
-                registry_state: RegistryState::new(&globals),
-                output_state: output_state,
-                shm,
-                layer,
-                pool,
-                buffer: None,
-                cache: Cache::new(),
-                width: args.width,
-                height: args.height,
-                configured: false,
-            };
+            registry_state: RegistryState::new(&globals),
+            output_state: output_state,
+            shm,
+            layer,
+            pool,
+            buffer: None,
+            cache: Cache::new(),
+            width: args.width,
+            height: args.height,
+            configured: false,
+        };
 
         _ = event_queue.blocking_dispatch(&mut state);
 
@@ -193,7 +193,7 @@ impl OverlayBackend for WaylandBackend {
     fn show(&self) {}
 
     fn run_event_queue(&mut self) {
-        let mut state = RenderState::new();
+        let mut state = self.make_render_state();
 
         loop {
             state.iteration += 1;
@@ -202,7 +202,8 @@ impl OverlayBackend for WaylandBackend {
     }
 
     fn draw(&mut self) {
-        self.data.draw(&RenderState::new());
+        let state = self.make_render_state();
+        self.data.draw(&state);
     }
 
     fn poll_event_queue(&mut self, state: &RenderState) {
@@ -218,9 +219,10 @@ impl OverlayBackend for WaylandBackend {
         }
     }
 
-    
+    fn make_render_state(&mut self) -> RenderState {
+        RenderState::new(&mut self.data.cache)
+    }
 }
-
 
 impl CompositorHandler for WaylandState {
     fn scale_factor_changed(
@@ -337,7 +339,8 @@ impl LayerShellHandler for WaylandState {
 
         if !self.configured {
             self.configured = true;
-            self.draw(&RenderState::new());
+            let state = RenderState::new(&mut self.cache);
+            self.draw(&state);
         }
     }
 }
