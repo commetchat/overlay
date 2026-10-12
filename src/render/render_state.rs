@@ -21,6 +21,7 @@ pub struct RenderState {
     pub images: BTreeMap<String, ImageState>,
     pub item_height: u32,
     pub changed: bool,
+    pub mute_icon: Option<ImageBuf>,
 }
 
 impl RenderState {
@@ -31,6 +32,7 @@ impl RenderState {
             item_height: 32,
             images: BTreeMap::new(),
             users: BTreeMap::new(),
+            mute_icon: None,
         };
     }
 
@@ -48,13 +50,10 @@ impl RenderState {
             .text()
             .font_family("Roboto")
             .unwrap_or(FontFamily::MONOSPACE);
-       
-        let col = Color::hlca(((self.iteration % 360) as f64) * 40.0, 50.0, 50.0, 0.8);
-        
+
         let draw_background = false;
         if draw_background {
             let height = (y_position * 2.0) + (text_size * 2.0 * (self.users.len() as f64));
-
 
             let gradient = piet::LinearGradient::new(
                 UnitPoint::new(0.0, 0.0),
@@ -80,7 +79,7 @@ impl RenderState {
 
             let draw_image_outline = entry.talking;
 
-            let show_icon = entry.muted;
+            let show_mute_icon = entry.muted;
 
             let shadow = ctx
                 .text()
@@ -153,26 +152,26 @@ impl RenderState {
             x += circle_radius * 2.0;
             x += text_size * 0.5;
 
-            if show_icon {
+            if show_mute_icon {
                 let icon_position = Point::new(
-                    x + circle_radius + shadow.size().width + y_pad,
-                    y_position + (circle_radius / 2.0) + y_pad,
+                    x + circle_radius + shadow.size().width + (y_pad * 4.0),
+                    y_position + (circle_radius / 2.0) + (y_pad * 1.5),
                 );
 
-                ctx.fill(Circle::new(icon_position, circle_radius * 0.5), &col);
+                let radius = circle_radius * 0.8;
+
+                let rect = Rect {
+                    x0: icon_position.x - radius,
+                    x1: icon_position.x + radius,
+                    y0: icon_position.y - radius,
+                    y1: icon_position.y + radius,
+                };
+
+                let img =  self.mute_icon.as_ref().unwrap().to_image(ctx);
+
+                ctx.draw_image(&img, rect, piet::InterpolationMode::Bilinear);
+
             }
-
-            // let size = shadow.image_bounds();
-
-            // ctx.fill(
-            //     Rect::new(
-            //         x_position,
-            //         y_position,
-            //         x_position + size.width() + 6.0,
-            //         y_position + size.height() + 2.0,
-            //     ),
-            //     &Color::rgba8(0, 0, 0, 120),
-            // );
 
             ctx.draw_text(&shadow, Point::new(x, y_position));
             ctx.draw_text(&highlight, Point::new(x - 1.0, y_position - 1.0));

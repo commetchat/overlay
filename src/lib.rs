@@ -92,6 +92,17 @@ pub fn run_overlay(dev_mode: bool) {
 
     let mut state = RenderState::new();
 
+    let icon_data = embed_file::embed_bytes!("../assets/mic_off.png");
+    let mute_icon = image::load_from_memory(&icon_data).unwrap();
+
+    let mute_icon = ImageBuf::from_raw(
+        mute_icon.to_rgba8().to_vec(),
+        piet::ImageFormat::RgbaSeparate,
+        mute_icon.width() as usize,
+        mute_icon.height() as usize,
+    );
+
+    state.mute_icon = Some(mute_icon);
     state.item_height = 16;
 
     if dev_mode {
@@ -271,15 +282,22 @@ fn handle_voip_state_changed(state: &mut RenderState, widget: &mut Widget, msg: 
                 }
             }
 
-            let unneeded_images: Vec<String> = state.images.iter_mut().filter(|(key, _)| 
-                !state.users.iter().any(|(_user, s)| s.avatar_url == Some(key.to_string())
-            )).map(|i| i.0.clone()).collect();
-            
+            let unneeded_images: Vec<String> = state
+                .images
+                .iter_mut()
+                .filter(|(key, _)| {
+                    !state
+                        .users
+                        .iter()
+                        .any(|(_user, s)| s.avatar_url == Some(key.to_string()))
+                })
+                .map(|i| i.0.clone())
+                .collect();
+
             for image in unneeded_images {
                 state.images.remove(&image);
                 info!("Removing unneeded image: {}", image);
             }
-
 
             state.changed = true;
         }
