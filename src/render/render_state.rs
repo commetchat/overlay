@@ -189,9 +189,9 @@ impl RenderState {
 
             let bg_padding = text_size * 0.2;
 
-            let bg_opacity = match entry.talking {
-                true => 100,
-                false => 50,
+            let bg_opacity = match entry.muted {
+                true => 50,
+                false => 100,
             };
 
             ctx.fill(
