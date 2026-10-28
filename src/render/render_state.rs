@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 
 use piet::{
-    Color, FontFamily, FontWeight, ImageBuf, RenderContext, Text, TextLayout, TextLayoutBuilder, UnitPoint, kurbo::{Circle, Point, Rect},
+    Color, FontFamily, FontWeight, ImageBuf, RenderContext, Text, TextLayout, TextLayoutBuilder,
+    UnitPoint,
+    kurbo::{Circle, Point, Rect, RoundedRect},
 };
 
 use piet_tiny_skia::Cache;
-use tiny_skia::PixmapMut;
+use tiny_skia::{PixmapMut};
 
 use crate::VoipMemberState;
 
@@ -64,7 +66,6 @@ impl RenderState {
         let mut y_position = text_size * 3.0;
         let x_position = text_size * 2.0;
 
-
         let draw_background = false;
         if draw_background {
             let height = (y_position * 2.0) + (text_size * 2.0 * (self.users.len() as f64));
@@ -94,18 +95,9 @@ impl RenderState {
             let draw_image_outline = entry.talking;
 
             let show_mute_icon = entry.muted;
-            
 
-            let shadow = ctx
-                .text()
-                .new_text_layout(text.clone())
-                .font(self.font.clone(), text_size)
-                .text_color(Color::rgba8(0, 0, 0, alpha))
-                .default_attribute(FontWeight::BOLD)
-                .build()
-                .unwrap();
 
-            let highlight = ctx
+            let name = ctx
                 .text()
                 .new_text_layout(text.clone())
                 .font(self.font.clone(), text_size)
@@ -169,28 +161,52 @@ impl RenderState {
             x += circle_radius * 2.0;
             x += text_size * 0.5;
 
+            let mut row_end = x + name.size().width;
+
+            let radius = circle_radius * 0.8;
+
             if show_mute_icon {
-                let icon_position = Point::new(
-                    x + circle_radius + shadow.size().width + (y_pad * 4.0),
-                    y_position + (circle_radius / 2.0) + (y_pad * 1.5),
-                );
-
-                let radius = circle_radius * 0.8;
-
-                let rect = Rect {
-                    x0: icon_position.x - radius,
-                    x1: icon_position.x + radius,
-                    y0: icon_position.y - radius,
-                    y1: icon_position.y + radius,
-                };
-
-                let img = self.mute_icon.to_image(ctx);
-
-                ctx.draw_image(&img, rect, piet::InterpolationMode::Bilinear);
+                row_end +=  (y_pad * 4.0) + radius;
             }
 
-            ctx.draw_text(&shadow, Point::new(x, y_position));
-            ctx.draw_text(&highlight, Point::new(x - 1.0, y_position - 1.0));
+
+            let icon_position =
+                Point::new(row_end, y_position + (circle_radius / 2.0) + (y_pad * 1.5));
+
+
+            let icon_rect = Rect {
+                x0: icon_position.x - radius,
+                x1: icon_position.x + radius,
+                y0: icon_position.y - radius,
+                y1: icon_position.y + radius,
+            };
+
+
+            if show_mute_icon {
+                row_end = icon_position.x + radius;
+            }
+
+
+            let bg_padding = text_size * 0.2;
+
+            let bg_opacity = match entry.talking {
+                true => 100,
+                false => 50,
+            };
+
+            ctx.fill(
+
+                RoundedRect::new(x - bg_padding, y_position - bg_padding, row_end + bg_padding, y_position + (bg_padding * 2.0) + text_size, 2.0),
+                &Color::rgba8(12, 12, 12, bg_opacity),
+            );
+
+            if show_mute_icon {
+                let img = self.mute_icon.to_image(ctx);
+
+                ctx.draw_image(&img, icon_rect, piet::InterpolationMode::Bilinear);
+            }
+
+            ctx.draw_text(&name, Point::new(x - 1.0, y_position - 1.0));
 
             y_position += text_size * 2.0;
         }
