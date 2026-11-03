@@ -77,8 +77,8 @@ impl OpenVRBackend {
                         info!("Got openvr context");
                         return context;
                     }
-                    Err(_) => {
-                        info!("Failed (Attempt {})", i);
+                    Err(e) => {
+                        info!("Failed (Attempt {}) {:?}", i, e);
                         thread::sleep(Duration::from_secs(3));
                     }
                 }
