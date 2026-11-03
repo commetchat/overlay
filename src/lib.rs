@@ -5,16 +5,15 @@ use piet::ImageBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[cfg(target_os = "windows")]
-use crate::backend::winit::WinitBackend;
 use crate::{
-    backend::{OverlayArgs, OverlayBackend},
+    backend::{OverlayArgs, OverlayBackend, openvr::OpenVRBackend, winit::WinitBackend},
     render::render_state::{ImageState, RenderState},
     widget::{Widget, WidgetMessage},
 };
 
 #[cfg(all(target_os = "linux"))]
 use crate::backend::wayland::WaylandBackend;
+
 
 #[cfg(all(target_os = "linux"))]
 use std::env;
@@ -30,39 +29,62 @@ mod backend;
 mod render;
 mod widget;
 
-pub fn pick_backend() -> Box<dyn OverlayBackend> {
-    let args = OverlayArgs {
-        width: 1024,
-        height: 1024,
-    };
+#[derive(PartialEq, Eq, Debug)]
+pub enum BackendType {
+    Wayland,
+    Winit,
+    OpenVR,
+}
+
+pub fn pick_backend_type() -> BackendType {
+    if openvr::is_hmd_present() && openvr::is_runtime_installed() {
+        return BackendType::OpenVR;
+    }
 
     #[cfg(target_os = "linux")]
     {
         let session = env::var("XDG_SESSION_TYPE").ok();
 
-        match session.as_deref() {
-            Some("wayland") => {
-                info!("Starting with wayland backend");
-                return Box::new(WaylandBackend::new(&args).unwrap());
-            }
-            _ => {
-                use crate::backend::winit::WinitBackend;
-
-                info!("Starting with winit backend");
-                return Box::new(WinitBackend::new(&args));
-            }
-        }
+        return match session.as_deref() {
+            Some("wayland") => BackendType::Wayland,
+            _ => return BackendType::Winit,
+        };
     }
 
     #[cfg(target_os = "windows")]
-    return Box::new(WinitBackend::new(&args));
+    return BackendType::Winit;
+}
+
+pub fn start_backend(backend_type: &BackendType) -> Box<dyn OverlayBackend> {
+    let args = OverlayArgs {
+        width: 1024,
+        height: 1024,
+    };
+
+    return match backend_type {
+        BackendType::Wayland => {
+            #[cfg(target_os = "linux")]
+            {
+                return Box::new(WaylandBackend::new(&args).unwrap());
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            {
+                use log::error;
+                error!("Cannot use 'Wayland' backend on a non-linux platform");
+                panic!()
+            }
+        }
+        BackendType::Winit => Box::new(WinitBackend::new(&args)),
+        BackendType::OpenVR => Box::new(OpenVRBackend::new(&args)),
+    };
 }
 
 pub enum Message {
     Line(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VoipMemberState {
     display_name: String,
     avatar_url: Option<String>,
@@ -84,7 +106,8 @@ pub fn run_overlay(dev_mode: bool) {
 
     info!("Starting overlay!");
 
-    let mut overlay = pick_backend();
+    let mut current_backend_type = pick_backend_type();
+    let mut overlay = start_backend(&current_backend_type);
 
     let (input_sender, input_receiver) = channel::<Message>();
 
@@ -92,15 +115,13 @@ pub fn run_overlay(dev_mode: bool) {
 
     let mut state = overlay.make_render_state();
 
-    state.item_height = 16;
-
     if dev_mode {
         state.users.insert(
             "@test:example.org".to_string(),
             VoipMemberState {
                 avatar_url: None,
                 display_name: "Luna".to_string(),
-                muted: false,
+                muted: true,
                 talking: false,
             },
         );
@@ -142,6 +163,25 @@ pub fn run_overlay(dev_mode: bool) {
         overlay.poll_event_queue(&state);
 
         state.changed = false;
+
+        let new_type = pick_backend_type();
+
+        if new_type != current_backend_type {
+            info!("Hot swapping to different backend: ${:?}", new_type);
+            overlay.dispose();
+
+            let mut new_overlay = start_backend(&new_type);
+            let mut new_state = new_overlay.make_render_state();
+
+            for user in state.users.iter() {
+                new_state.users.insert(user.0.clone(), user.1.clone());
+            }
+
+            new_state.changed = true;
+            state = new_state;
+            overlay = new_overlay;
+            current_backend_type = new_type;
+        }
 
         std::thread::sleep(Duration::from_millis(35));
     }

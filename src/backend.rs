@@ -1,5 +1,6 @@
 use crate::render::render_state::RenderState;
 
+pub mod openvr;
 pub mod winit;
 
 #[cfg(target_os = "linux")]
@@ -11,7 +12,7 @@ pub struct OverlayArgs {
 }
 
 pub trait OverlayBackend {
-    fn show(&self);
+    fn show(&mut self);
 
     fn run_event_queue(&mut self);
 
@@ -20,4 +21,6 @@ pub trait OverlayBackend {
     fn draw(&mut self);
 
     fn make_render_state(&mut self) -> RenderState;
+
+    fn dispose(&mut self);
 }
