@@ -240,7 +240,7 @@ impl WinitData {
 }
 
 impl OverlayBackend for WinitBackend {
-    fn show(&self) {}
+    fn show(&mut self) {}
 
     fn run_event_queue(&mut self) {
         let event_loop = EventLoop::new().unwrap();
@@ -261,8 +261,12 @@ impl OverlayBackend for WinitBackend {
         let state = RenderState::new(&mut self.data.cache);
         self.data.draw(&state);
     }
-    
+
     fn make_render_state(&mut self) -> RenderState {
         RenderState::new(&mut self.data.cache)
+    }
+
+    fn dispose(&mut self) {
+        self.data.window = None;
     }
 }
