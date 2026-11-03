@@ -16,6 +16,7 @@ use crate::{
 #[cfg(all(target_os = "linux"))]
 use crate::backend::wayland::WaylandBackend;
 
+use core::panic;
 #[cfg(all(target_os = "linux"))]
 use std::env;
 use std::{
@@ -63,7 +64,19 @@ pub fn start_backend(backend_type: &BackendType) -> Box<dyn OverlayBackend> {
     };
 
     return match backend_type {
-        BackendType::Wayland => Box::new(WaylandBackend::new(&args).unwrap()),
+        BackendType::Wayland => {
+            #[cfg(target_os = "linux")]
+            {
+                return Box::new(WaylandBackend::new(&args).unwrap());
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            {
+                use log::error;
+                error!("Cannot use 'Wayland' backend on a non-linux platform");
+                panic!()
+            }
+        }
         BackendType::Winit => Box::new(WinitBackend::new(&args)),
         BackendType::OpenVR => Box::new(OpenVRBackend::new(&args)),
     };
