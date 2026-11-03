@@ -5,8 +5,6 @@ use piet::ImageBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[cfg(target_os = "windows")]
-use crate::backend::winit::WinitBackend;
 use crate::{
     backend::{OverlayArgs, OverlayBackend, openvr::OpenVRBackend, winit::WinitBackend},
     render::render_state::{ImageState, RenderState},
@@ -16,7 +14,7 @@ use crate::{
 #[cfg(all(target_os = "linux"))]
 use crate::backend::wayland::WaylandBackend;
 
-use core::panic;
+
 #[cfg(all(target_os = "linux"))]
 use std::env;
 use std::{
