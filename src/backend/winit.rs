@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::info;
+use log::warn;
 use piet_tiny_skia::Cache;
 use softbuffer::{Context, Surface};
 use winit::application::ApplicationHandler;
@@ -60,6 +61,41 @@ impl WinitBackend {
         );
 
         return result;
+    }
+}
+
+impl WinitData {
+    #[cfg(target_os = "linux")]
+    pub fn register_as_gamescope_overlay(
+        window: &winit::window::Window,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        use x11rb::{
+            connection::Connection,
+            protocol::xproto::{AtomEnum, ConnectionExt as XprotoConnectionExt, PropMode},
+            wrapper::ConnectionExt as WrapperConnectionExt,
+        };
+
+        let (connection, _) = x11rb::connect(None)?;
+
+        let h = window.window_handle()?;
+
+        let id = match h.as_raw() {
+            RawWindowHandle::Xlib(handle) => handle.window as u32,
+            _ => return Err("cant set overlay unless window is x11".into()),
+        };
+        
+        let atom = connection
+            .intern_atom(false, b"GAMESCOPE_EXTERNAL_OVERLAY")?
+            .reply()?
+            .atom;
+
+        connection.change_property32(PropMode::REPLACE, id, atom, AtomEnum::CARDINAL, &[1])?
+            .check()?;
+
+        connection.flush()?;
+
+        Ok(())
     }
 }
 
@@ -133,6 +169,14 @@ impl ApplicationHandler for WinitData {
                         );
                     }
                 }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            match WinitData::register_as_gamescope_overlay(&window) {
+                Ok(_) => info!("Registered gamescope overlay"),
+                Err(_) => warn!("Failed to register gamescope overlay"),
             }
         }
 
