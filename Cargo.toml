@@ -23,4 +23,5 @@ windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 wayland-client = "0.31.14"
+x11rb = "0.14.0"
 smithay-client-toolkit = "0.21.1" 
