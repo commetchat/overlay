@@ -96,12 +96,15 @@ impl Widget {
     pub fn handle_message(&mut self, msg: &WidgetMessage) {
         match msg.action.as_str() {
             "capabilities" => {
-                self.send_response(msg, json!({
-                    "capabilities": [
-                        "org.matrix.msc4039.download_file",
-                        "chat.commet.voip_overlay.voip_state"
-                    ]
-                }));
+                self.send_response(
+                    msg,
+                    json!({
+                        "capabilities": [
+                            "org.matrix.msc4039.download_file",
+                            "chat.commet.voip_overlay.voip_state"
+                        ]
+                    }),
+                );
             }
             _ => {}
         }

@@ -7,7 +7,7 @@ use piet::{
 };
 
 use piet_tiny_skia::Cache;
-use tiny_skia::{PixmapMut};
+use tiny_skia::PixmapMut;
 
 use crate::VoipMemberState;
 
@@ -48,7 +48,7 @@ impl RenderState {
         return RenderState {
             iteration: 0,
             changed: true,
-            item_height: 32,
+            item_height: 16,
             images: BTreeMap::new(),
             users: BTreeMap::new(),
             mute_icon: mute_icon,
@@ -95,7 +95,6 @@ impl RenderState {
             let draw_image_outline = entry.talking;
 
             let show_mute_icon = entry.muted;
-
 
             let name = ctx
                 .text()
@@ -166,13 +165,11 @@ impl RenderState {
             let radius = circle_radius * 0.8;
 
             if show_mute_icon {
-                row_end +=  (y_pad * 4.0) + radius;
+                row_end += (y_pad * 4.0) + radius;
             }
-
 
             let icon_position =
                 Point::new(row_end, y_position + (circle_radius / 2.0) + (y_pad * 1.5));
-
 
             let icon_rect = Rect {
                 x0: icon_position.x - radius,
@@ -181,11 +178,9 @@ impl RenderState {
                 y1: icon_position.y + radius,
             };
 
-
             if show_mute_icon {
                 row_end = icon_position.x + radius;
             }
-
 
             let bg_padding = text_size * 0.2;
 
@@ -195,8 +190,13 @@ impl RenderState {
             };
 
             ctx.fill(
-
-                RoundedRect::new(x - bg_padding, y_position - bg_padding, row_end + bg_padding, y_position + (bg_padding * 2.0) + text_size, 2.0),
+                RoundedRect::new(
+                    x - bg_padding,
+                    y_position - bg_padding,
+                    row_end + bg_padding,
+                    y_position + (bg_padding * 2.0) + text_size,
+                    2.0,
+                ),
                 &Color::rgba8(12, 12, 12, bg_opacity),
             );
 

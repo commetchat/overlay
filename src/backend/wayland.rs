@@ -23,7 +23,9 @@ use smithay_client_toolkit::{
 };
 
 use wayland_client::{
-    Connection, EventQueue, QueueHandle, globals::registry_queue_init, protocol::{wl_output, wl_region::WlRegion, wl_shm, wl_surface},
+    Connection, EventQueue, QueueHandle,
+    globals::registry_queue_init,
+    protocol::{wl_output, wl_region::WlRegion, wl_shm, wl_surface},
 };
 
 use crate::{
@@ -190,7 +192,7 @@ impl WaylandState {
 }
 
 impl OverlayBackend for WaylandBackend {
-    fn show(&self) {}
+    fn show(&mut self) {}
 
     fn run_event_queue(&mut self) {
         let mut state = self.make_render_state();
@@ -221,6 +223,10 @@ impl OverlayBackend for WaylandBackend {
 
     fn make_render_state(&mut self) -> RenderState {
         RenderState::new(&mut self.data.cache)
+    }
+
+    fn dispose(&mut self) {
+        self.event_queue.flush();
     }
 }
 
