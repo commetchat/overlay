@@ -88,6 +88,8 @@ impl OpenVRBackend {
         panic!()
     }
 
+    const DEFAULT_OFFSET: [f32; 3] = [-0.15, 0.05, -1.0];
+
     pub fn new(args: &OverlayArgs) -> OpenVRBackend {
         let context = Self::get_context();
 
@@ -101,7 +103,7 @@ impl OpenVRBackend {
 
         let controller_index = openvr::TrackedDeviceIndex(0);
 
-        let transform = make_transform([-0.15, 0.05, -1.0], [0.3, 0.3, 0.0], [1.0, 1.0, 1.0]);
+        let transform = make_transform(Self::DEFAULT_OFFSET, [0.3, 0.3, 0.0], [1.0, 1.0, 1.0]);
 
         overlay
             .set_transform_tracked_device_relative(handle, controller_index, &transform)
@@ -170,6 +172,24 @@ impl OverlayBackend for OpenVRBackend {
             }
         }
 
+        if state.position_changed {
+            let controller_index = openvr::TrackedDeviceIndex(0);
+
+            let transform = make_transform(
+                [
+                    Self::DEFAULT_OFFSET[0] + (state.position.x * 0.001),
+                    Self::DEFAULT_OFFSET[1] + (state.position.y * 0.001),
+                    Self::DEFAULT_OFFSET[2] + (state.position.z * 0.001),
+                ],
+                [0.3, 0.3, 0.0],
+                [1.0, 1.0, 1.0],
+            );
+
+            self.overlay
+                .set_transform_tracked_device_relative(self.handle, controller_index, &transform)
+                .unwrap();
+        }
+
         if state.changed {
             self.draw_overlay(state);
 
@@ -182,7 +202,7 @@ impl OverlayBackend for OpenVRBackend {
     fn make_render_state(&mut self) -> RenderState {
         let mut state = RenderState::new(&mut self.cache);
         state.item_height = 32;
-
+        state.offset_in_render = false;
         state
     }
 

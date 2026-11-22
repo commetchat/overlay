@@ -17,6 +17,12 @@ pub enum ImageState {
     FailedToDecode,
 }
 
+pub struct Vector3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
 pub struct RenderState {
     pub iteration: i32,
     pub users: BTreeMap<String, VoipMemberState>,
@@ -25,6 +31,9 @@ pub struct RenderState {
     pub changed: bool,
     pub mute_icon: ImageBuf,
     pub font: FontFamily,
+    pub position: Vector3,
+    pub offset_in_render: bool,
+    pub position_changed: bool,
 }
 
 impl RenderState {
@@ -53,6 +62,9 @@ impl RenderState {
             users: BTreeMap::new(),
             mute_icon: mute_icon,
             font: txt,
+            position: Vector3 { x: 0.0, y: 0.0, z: 0.0 },
+            offset_in_render: true,
+            position_changed: true
         };
     }
 
@@ -64,7 +76,12 @@ impl RenderState {
         let text_size = self.item_height as f64;
 
         let mut y_position = text_size * 3.0;
-        let x_position = text_size * 2.0;
+        let mut x_position = text_size * 2.0;
+
+        if self.offset_in_render {
+            x_position += self.position.x as f64;
+            y_position += self.position.y as f64;
+        }
 
         let draw_background = false;
         if draw_background {

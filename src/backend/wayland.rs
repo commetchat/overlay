@@ -215,7 +215,9 @@ impl OverlayBackend for WaylandBackend {
             log::info!("State changed, redrawing");
         }
 
-        if self.data.configured && state.changed {
+        let needs_redraw = state.changed || (state.position_changed && state.offset_in_render);
+
+        if self.data.configured && needs_redraw {
             self.data.draw(state);
             let _ = self.event_queue.blocking_dispatch(&mut self.data);
         }

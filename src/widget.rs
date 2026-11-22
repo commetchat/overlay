@@ -101,7 +101,8 @@ impl Widget {
                     json!({
                         "capabilities": [
                             "org.matrix.msc4039.download_file",
-                            "chat.commet.voip_overlay.voip_state"
+                            "chat.commet.voip_overlay.voip_state",
+                            "chat.commet.voip_overlay.changed_configuration",
                         ]
                     }),
                 );

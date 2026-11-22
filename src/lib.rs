@@ -15,6 +15,7 @@ use crate::{
 use crate::backend::wayland::WaylandBackend;
 
 
+use core::panic;
 #[cfg(all(target_os = "linux"))]
 use std::env;
 use std::{
@@ -93,6 +94,12 @@ pub struct VoipMemberState {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct OverlayConfigData {
+    offset_x: f32,
+    offset_y: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct VoipStateData {
     state: BTreeMap<String, VoipMemberState>,
 }
@@ -152,9 +159,8 @@ pub fn run_overlay(dev_mode: bool) {
     widget.send_from_widget("supported_api_versions", json!({}));
 
     loop {
-        let msg = widget.read_message(&input_receiver);
 
-        if let Some(msg) = msg {
+        while let Some(msg) =  widget.read_message(&input_receiver) {
             handle_messages(&mut state, &mut widget, msg);
         }
 
@@ -163,6 +169,7 @@ pub fn run_overlay(dev_mode: bool) {
         overlay.poll_event_queue(&state);
 
         state.changed = false;
+        state.position_changed = false;
 
         let new_type = pick_backend_type();
 
@@ -178,6 +185,7 @@ pub fn run_overlay(dev_mode: bool) {
             }
 
             new_state.changed = true;
+            new_state.position_changed = true;
             state = new_state;
             overlay = new_overlay;
             current_backend_type = new_type;
@@ -191,6 +199,9 @@ fn handle_messages(state: &mut RenderState, widget: &mut Widget, msg: WidgetMess
     match msg.action.as_str() {
         "chat.commet.voip_overlay.voip_state" => {
             handle_voip_state_changed(state, widget, msg);
+        },
+        "chat.commet.voip_overlay.changed_configuration" => {
+            handle_configuration_changed(state, widget, msg);
         }
         "org.matrix.msc4039.download_file" => {
             _ = handle_file_download(state, widget, msg);
@@ -201,6 +212,25 @@ fn handle_messages(state: &mut RenderState, widget: &mut Widget, msg: WidgetMess
 
 enum WidgetError {
     InvalidRequest,
+}
+
+
+fn handle_configuration_changed(
+    state: &mut RenderState,
+    _widget: &mut Widget,
+    msg: WidgetMessage,
+)  {
+    match serde_json::from_value::<OverlayConfigData>(msg.data) {
+        Result::Ok(v) => {
+            info!("Got new config data: {:?}", v);
+
+            state.position.x = v.offset_x;
+            state.position.y = v.offset_y;
+
+            state.position_changed = true;
+        },
+        Err(_) => warn!("Failed to parse config event"),
+    }
 }
 
 fn handle_file_download(
