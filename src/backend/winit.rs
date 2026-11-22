@@ -296,7 +296,10 @@ impl OverlayBackend for WinitBackend {
         self.event_loop
             .pump_app_events(Some(Duration::ZERO), &mut self.data);
 
-        if state.changed {
+
+        let needs_redraw = state.changed || (state.position_changed && state.offset_in_render);
+
+        if needs_redraw {
             self.data.draw(&state);
         }
     }
